@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import styled from 'styled-components'
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
-import axios from 'axios'
 
 const App = () => {
   const [files, setFiles] = useState([])
@@ -10,7 +9,7 @@ const App = () => {
   const [borderWidth, setBorderWidth] = useState(5)
 
   const handleFileChange = (event) => {
-    const uploadedFiles = Array.from(event.target.files)
+    const uploadedFiles = Array.from(event.target.files).filter((file) => file.type.startsWith('image'))
     setFiles(uploadedFiles)
   }
 
@@ -25,13 +24,7 @@ const App = () => {
   const handleDownloadZip = async () => {
     const zip = new JSZip()
 
-    const filePromises = files.map((file) => {
-      if (file.type.startsWith('image')) {
-        return processImageFile(file, zip)
-      } else if (file.type.startsWith('video')) {
-        return processVideoFile(file, zip)
-      }
-    })
+    const filePromises = files.map((file) => processImageFile(file, zip))
 
     await Promise.all(filePromises)
 
@@ -61,38 +54,13 @@ const App = () => {
     })
   }
 
-  const processVideoFile = (file, zip) => {
-    return new Promise((resolve, reject) => {
-      const formData = new FormData()
-      formData.append('video', file)
-
-      axios
-        .post('http://localhost:3000/upload', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-          responseType: 'blob',
-        })
-        .then((response) => {
-          const newFilename = `${file.name}_bordered.mp4`
-          const newBlob = new Blob([response.data], { type: 'video/mp4' })
-          zip.file(newFilename, newBlob)
-          resolve()
-        })
-        .catch((error) => {
-          console.error('Error uploading video:', error)
-          reject(error)
-        })
-    })
-  }
-
   return (
     <Container>
-      <Title>Border Tool for Images & Videos</Title>
+      <Title>Border Tool for Images</Title>
 
       <InputSection>
-        <label htmlFor='file-upload'>Upload Images/Videos:</label>
-        <input type='file' id='file-upload' onChange={handleFileChange} multiple accept='image/*,video/*' />
+        <label htmlFor='file-upload'>Upload Images:</label>
+        <input type='file' id='file-upload' onChange={handleFileChange} multiple accept='image/*' />
 
         <label htmlFor='border-color'>Border Color:</label>
         <input type='color' id='border-color' value={borderColor} onChange={handleBorderColorChange} />
@@ -102,23 +70,11 @@ const App = () => {
       </InputSection>
 
       <PreviewSection>
-        {files.map((file, index) => {
-          if (file.type.startsWith('image')) {
-            return (
-              <ImagePreview key={index}>
-                <img src={URL.createObjectURL(file)} alt={file.name} style={{ border: `${borderWidth}px solid ${borderColor}` }} />
-              </ImagePreview>
-            )
-          } else if (file.type.startsWith('video')) {
-            return (
-              <VideoPreview key={index}>
-                <video src={URL.createObjectURL(file)} controls style={{ border: `${borderWidth}px solid ${borderColor}` }}></video>
-              </VideoPreview>
-            )
-          } else {
-            return null
-          }
-        })}
+        {files.map((file, index) => (
+          <ImagePreview key={index}>
+            <img src={URL.createObjectURL(file)} alt={file.name} style={{ border: `${borderWidth}px solid ${borderColor}` }} />
+          </ImagePreview>
+        ))}
       </PreviewSection>
 
       <DownloadButton onClick={handleDownloadZip}>Download All as ZIP</DownloadButton>
@@ -163,13 +119,6 @@ const PreviewSection = styled.div`
 
 const ImagePreview = styled.div`
   img {
-    max-width: 200px;
-    max-height: 200px;
-  }
-`
-
-const VideoPreview = styled.div`
-  video {
     max-width: 200px;
     max-height: 200px;
   }
